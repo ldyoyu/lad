@@ -20,7 +20,7 @@
 
 //go:build go1.21
 
-package zapslog
+package ladslog
 
 import (
 	"bytes"
@@ -31,17 +31,18 @@ import (
 	"testing/slogtest"
 	"time"
 
+	"github.com/ldyoyu/lad/ladcore"
+	"github.com/ldyoyu/lad/ladtest"
+	"github.com/ldyoyu/lad/ladtest/observer"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap/zapcore"
-	"go.uber.org/zap/zaptest"
-	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestAddCaller(t *testing.T) {
 	t.Parallel()
 
-	fac, logs := observer.New(zapcore.DebugLevel)
+	fac, logs := observer.New(ladcore.DebugLevel)
 	sl := slog.New(NewHandler(fac, WithCaller(true)))
 	sl.Info("msg")
 
@@ -56,7 +57,7 @@ func TestAddCaller(t *testing.T) {
 }
 
 func TestAddStack(t *testing.T) {
-	fac, logs := observer.New(zapcore.DebugLevel)
+	fac, logs := observer.New(ladcore.DebugLevel)
 	sl := slog.New(NewHandler(fac, AddStacktraceAt(slog.LevelDebug)))
 	sl.Info("msg")
 
@@ -64,7 +65,7 @@ func TestAddStack(t *testing.T) {
 	entry := logs.AllUntimed()[0]
 	require.Equal(t, "msg", entry.Message, "Unexpected message")
 	assert.Regexp(t,
-		`^go.uber.org/zap/exp/zapslog.TestAddStack`,
+		`^github.com/ldyoyu/lad/exp/zapslog.TestAddStack`,
 		entry.Stack,
 		"Unexpected stack trace annotation.",
 	)
@@ -76,7 +77,7 @@ func TestAddStack(t *testing.T) {
 }
 
 func TestAddStackSkip(t *testing.T) {
-	fac, logs := observer.New(zapcore.DebugLevel)
+	fac, logs := observer.New(ladcore.DebugLevel)
 	sl := slog.New(NewHandler(fac, AddStacktraceAt(slog.LevelDebug), WithCallerSkip(1)))
 	sl.Info("msg")
 
@@ -92,7 +93,7 @@ func TestAddStackSkip(t *testing.T) {
 func TestEmptyAttr(t *testing.T) {
 	t.Parallel()
 
-	fac, observedLogs := observer.New(zapcore.DebugLevel)
+	fac, observedLogs := observer.New(ladcore.DebugLevel)
 	sl := slog.New(NewHandler(fac))
 
 	t.Run("Handle", func(t *testing.T) {
@@ -133,7 +134,7 @@ func TestEmptyAttr(t *testing.T) {
 }
 
 func TestWithName(t *testing.T) {
-	fac, observedLogs := observer.New(zapcore.DebugLevel)
+	fac, observedLogs := observer.New(ladcore.DebugLevel)
 
 	t.Run("default", func(t *testing.T) {
 		sl := slog.New(NewHandler(fac))
@@ -156,7 +157,7 @@ func TestWithName(t *testing.T) {
 }
 
 func TestInlineGroup(t *testing.T) {
-	fac, observedLogs := observer.New(zapcore.DebugLevel)
+	fac, observedLogs := observer.New(ladcore.DebugLevel)
 
 	t.Run("simple", func(t *testing.T) {
 		sl := slog.New(NewHandler(fac))
@@ -186,7 +187,7 @@ func TestInlineGroup(t *testing.T) {
 }
 
 func TestWithGroup(t *testing.T) {
-	fac, observedLogs := observer.New(zapcore.DebugLevel)
+	fac, observedLogs := observer.New(ladcore.DebugLevel)
 
 	// Groups can be nested inside each other.
 	t.Run("nested", func(t *testing.T) {
@@ -278,23 +279,23 @@ func TestConcurrentLogs(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		buildHandler func(zapcore.Core) slog.Handler
+		buildHandler func(ladcore.Core) slog.Handler
 	}{
 		{
 			name: "default",
-			buildHandler: func(core zapcore.Core) slog.Handler {
+			buildHandler: func(core ladcore.Core) slog.Handler {
 				return NewHandler(core)
 			},
 		},
 		{
 			name: "grouped",
-			buildHandler: func(core zapcore.Core) slog.Handler {
+			buildHandler: func(core ladcore.Core) slog.Handler {
 				return NewHandler(core).WithGroup("G")
 			},
 		},
 		{
 			name: "named",
-			buildHandler: func(core zapcore.Core) slog.Handler {
+			buildHandler: func(core ladcore.Core) slog.Handler {
 				return NewHandler(core, WithName("test-name"))
 			},
 		},
@@ -305,7 +306,7 @@ func TestConcurrentLogs(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			fac, observedLogs := observer.New(zapcore.DebugLevel)
+			fac, observedLogs := observer.New(ladcore.DebugLevel)
 			sl := slog.New(tt.buildHandler(fac))
 
 			// Use two wait groups to coordinate the workers:
@@ -347,7 +348,7 @@ func (Token) LogValue() slog.Value {
 }
 
 func TestAttrKinds(t *testing.T) {
-	fac, logs := observer.New(zapcore.DebugLevel)
+	fac, logs := observer.New(ladcore.DebugLevel)
 	sl := slog.New(NewHandler(fac))
 	testToken := Token("no")
 	sl.Info(
@@ -382,23 +383,23 @@ func TestAttrKinds(t *testing.T) {
 
 func TestSlogtest(t *testing.T) {
 	var buff bytes.Buffer
-	core := zapcore.NewCore(
-		zapcore.NewJSONEncoder(zapcore.EncoderConfig{
+	core := ladcore.NewCore(
+		ladcore.NewJSONEncoder(ladcore.EncoderConfig{
 			TimeKey:     slog.TimeKey,
 			MessageKey:  slog.MessageKey,
 			LevelKey:    slog.LevelKey,
-			EncodeLevel: zapcore.CapitalLevelEncoder,
-			EncodeTime:  zapcore.RFC3339TimeEncoder,
+			EncodeLevel: ladcore.CapitalLevelEncoder,
+			EncodeTime:  ladcore.RFC3339TimeEncoder,
 		}),
-		zapcore.AddSync(&buff),
-		zapcore.DebugLevel,
+		ladcore.AddSync(&buff),
+		ladcore.DebugLevel,
 	)
 
-	// zaptest doesn't expose the underlying core,
+	// ladtest doesn't expose the underlying core,
 	// so we'll extract it from the logger.
-	testCore := zaptest.NewLogger(t).Core()
+	testCore := ladtest.NewLogger(t).Core()
 
-	handler := NewHandler(zapcore.NewTee(core, testCore))
+	handler := NewHandler(ladcore.NewTee(core, testCore))
 	err := slogtest.TestHandler(
 		handler,
 		func() []map[string]any {
